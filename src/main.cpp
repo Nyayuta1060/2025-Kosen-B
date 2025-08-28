@@ -1,0 +1,134 @@
+#include "mbed.h"
+#include "C620.hpp"
+#include "PID_new.hpp"
+#include <array>
+
+CAN can(PC_6,PC_7,1e6);
+BufferedSerial(USBTX,USBRX,115200);
+dji::C620 robomas(PD_6,PD_5);
+
+constexpr int canid = 1;
+
+std::array<Pid, robomas_amount> pid = {
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1}),
+  Pid({gain, -1, 1})
+}
+
+constexpr int can_id[3] = {1,2,4};
+int pwm1[4] = {0};
+int pwm2[4] = {0};
+int pwm3[4] = {0};
+
+float duration_to_sec(const std::chrono::duration<float> &duration);
+
+struct PS5
+{
+    int8_t lstick_x = 0;
+    int8_t lstick_y = 0;
+    int8_t rstick_x = 0;
+    int8_t rstick_y = 0;
+    uint8_t l2 = 0;
+    uint8_t r2 = 0;
+
+    bool right = 0;
+    bool up = 0;
+    bool left = 0;
+    bool down = 0;
+    bool circle = 0;
+    bool triangle = 0;
+    bool square = 0;
+    bool cross = 0;
+    bool l1 = 0;
+    bool r1 = 0;
+    bool l3 = 0;
+    bool r3 = 0;
+    bool option = 0;
+    bool share = 0;
+
+    void parse(CANMessage msg)
+    {
+        switch (msg.id)
+        {
+            case 50:
+            lstick_x = msg.data[0];
+            lstick_y = msg.data[1];
+            rstick_x = msg.data[2];
+            rstick_y = msg.data[3];
+            l2 = msg.data[4];
+            r2 = msg.data[5];
+            break;
+
+            case 51:
+            right = msg.data[0] >> 3 & 1;
+            up = msg.data[0] >> 2 & 1;
+            left = msg.data[0] >> 1 & 1;
+            down = msg.data[0] & 1;
+            circle = msg.data[1] >> 3 & 1;
+            triangle = msg.data[1] >> 2 & 1;
+            square = msg.data[1] >> 1 & 1;
+            cross = msg.data[1] & 1;
+            l1 = msg.data[2];
+            r1 = msg.data[3];
+            l3 = msg.data[4];
+            r3 = msg.data[5];
+            option = msg.data[6];
+            share = msg.data[7];
+            break;
+        }
+    }
+
+    bool read(CAN& can)
+    {
+        CANMessage msg;
+        if (can.read(msg); msg.id == 50 || msg.id == 51)
+        {
+            parse(msg);
+            return true;
+        }
+        return false;
+    }
+};
+
+int main(){
+  PS5 ps5;
+  int16_t robomas_rpm[8] = {0};
+  auto now = HighResClock::now();
+  static auto pre = now;
+
+  for (int i = 0; i < robomas_amount; ++i)
+  {
+      pid[i].reset();
+  }
+
+  if(now - pre > 10ms){
+    float elapsed = duration_to_sec(now - pre);
+
+    for (int i = 0; i < robomas_amount; i++){
+      int motor_dps = robomas.get_rpm(i + 1);
+      const float percent = pid[i].calc(robomas_rpm[i], motor_dps, elapsed);
+
+      robomas.set_output_percent(percent, i + 1);
+      }
+    
+    CANMessage msg1(can_id[0], (const uint8_t *)&pwm1, 8);
+    CANMessage msg2(can_id[1], (const uint8_t *)&pwm2, 8);
+    CANMessage msg3(can_id[1], (const uint8_t *)&pwm3, 8);
+    can.write(msg1);
+    can.write(msg2);
+    can.write(msg3)
+
+    robomas.write();
+    pre = now;
+  }
+}
+
+float duration_to_sec(const std::chrono::duration<float> &duration)
+{
+    return duration.count();
+}
