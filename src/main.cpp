@@ -4,7 +4,8 @@
 #include <array>
 
 CAN can(PC_6,PC_7,1e6);
-BufferedSerial(USBTX,USBRX,115200);
+PidGain gain ={0.001, 0.001, 0.0};
+BufferedSerial pc(USBTX,USBRX,115200);
 dji::C620 robomas(PD_6,PD_5);
 
 std::array<Pid, robomas_amount> pid = {
@@ -16,12 +17,12 @@ std::array<Pid, robomas_amount> pid = {
   Pid({gain, -1, 1}),
   Pid({gain, -1, 1}),
   Pid({gain, -1, 1})
-}
+};
 
 constexpr int can_id[3] = {1,2,4};
-int pwm1[4] = {0};
-int pwm2[4] = {0};
-int pwm3[4] = {0};
+int16_t pwm1[4] = {0};
+int16_t pwm2[4] = {0};
+int16_t pwm3[4] = {0};
 
 float duration_to_sec(const std::chrono::duration<float> &duration);
 
@@ -99,6 +100,11 @@ int main(){
 
   constexpr int blocker_speed = 10000;
 
+  for (int i = 0; i < robomas_amount; ++i)
+  {
+      pid[i].reset();
+  }
+
   while(1){
 
     static bool pre_cross = 0;
@@ -109,12 +115,12 @@ int main(){
 
     //ボタンの入力処理
     if(ps5.read(can)){
-      if(circle == 1 && pre_circle == 0 && cross == 0){
+      if(ps5.circle == 1 && pre_circle == 0 && ps5.cross == 0){
         pwm1[0] = blocker_speed;
-      }else if(cross == 1 && pre_cross == 0 && circle == 0){
+      }else if(ps5.cross == 1 && pre_cross == 0 && ps5.circle == 0){
         pwm1[0] = -blocker_speed;
       }else{
-        pwm1[0] = 0
+        pwm1[0] = 0;
       }
 
       pre_circle = ps5.circle;
@@ -122,10 +128,6 @@ int main(){
     }
 
     //CAN送信処理
-    for (int i = 0; i < robomas_amount; ++i)
-    {
-        pid[i].reset();
-    }
 
     if(now - pre > 10ms){
       float elapsed = duration_to_sec(now - pre);
@@ -139,18 +141,18 @@ int main(){
 
       CANMessage msg1(can_id[0], (const uint8_t *)&pwm1, 8);
       CANMessage msg2(can_id[1], (const uint8_t *)&pwm2, 8);
-      CANMessage msg3(can_id[1], (const uint8_t *)&pwm3, 8);
+      CANMessage msg3(can_id[2], (const uint8_t *)&pwm3, 8);
       can.write(msg1);
       can.write(msg2);
-      can.write(msg3)
+      can.write(msg3);
 
       robomas.write();
       pre = now;
     }
   }
+}
 
-  float duration_to_sec(const std::chrono::duration<float> &duration)
-  {
-      return duration.count();
-  }
+float duration_to_sec(const std::chrono::duration<float> &duration)
+{
+    return duration.count();
 }
