@@ -96,37 +96,61 @@ struct PS5
 int main(){
   PS5 ps5;
   int16_t robomas_rpm[8] = {0};
-  auto now = HighResClock::now();
-  static auto pre = now;
 
-  for (int i = 0; i < robomas_amount; ++i)
-  {
-      pid[i].reset();
-  }
+  constexpr int blocker_speed = 10000;
 
-  if(now - pre > 10ms){
-    float elapsed = duration_to_sec(now - pre);
+  while(1){
 
-    for (int i = 0; i < robomas_amount; i++){
-      int motor_dps = robomas.get_rpm(i + 1);
-      const float percent = pid[i].calc(robomas_rpm[i], motor_dps, elapsed);
+    static bool pre_cross = 0;
+    static bool pre_circle = 0;
+    auto now = HighResClock::now();
+    static auto pre = now;
+    robomas.read_data();
 
-      robomas.set_output_percent(percent, i + 1);
+    //ボタンの入力処理
+    if(ps5.read(can)){
+      if(circle == 1 && pre_circle == 0 && cross == 0){
+        pwm1[0] = blocker_speed;
+      }else if(cross == 1 && pre_cross == 0 && circle == 0){
+        pwm1[0] = -blocker_speed;
+      }else{
+        pwm1[0] = 0
       }
-    
-    CANMessage msg1(can_id[0], (const uint8_t *)&pwm1, 8);
-    CANMessage msg2(can_id[1], (const uint8_t *)&pwm2, 8);
-    CANMessage msg3(can_id[1], (const uint8_t *)&pwm3, 8);
-    can.write(msg1);
-    can.write(msg2);
-    can.write(msg3)
 
-    robomas.write();
-    pre = now;
+      pre_circle = ps5.circle;
+      pre_cross = ps5.cross;
+    }
+
+    //CAN送信処理
+    for (int i = 0; i < robomas_amount; ++i)
+    {
+        pid[i].reset();
+    }
+
+    if(now - pre > 10ms){
+      float elapsed = duration_to_sec(now - pre);
+
+      for (int i = 0; i < robomas_amount; i++){
+        int motor_dps = robomas.get_rpm(i + 1);
+        const float percent = pid[i].calc(robomas_rpm[i], motor_dps, elapsed);
+
+        robomas.set_output_percent(percent, i + 1);
+        }
+
+      CANMessage msg1(can_id[0], (const uint8_t *)&pwm1, 8);
+      CANMessage msg2(can_id[1], (const uint8_t *)&pwm2, 8);
+      CANMessage msg3(can_id[1], (const uint8_t *)&pwm3, 8);
+      can.write(msg1);
+      can.write(msg2);
+      can.write(msg3)
+
+      robomas.write();
+      pre = now;
+    }
   }
-}
 
-float duration_to_sec(const std::chrono::duration<float> &duration)
-{
-    return duration.count();
+  float duration_to_sec(const std::chrono::duration<float> &duration)
+  {
+      return duration.count();
+  }
 }
