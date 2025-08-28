@@ -7,8 +7,6 @@ CAN can(PC_6,PC_7,1e6);
 BufferedSerial(USBTX,USBRX,115200);
 dji::C620 robomas(PD_6,PD_5);
 
-constexpr int canid = 1;
-
 std::array<Pid, robomas_amount> pid = {
   Pid({gain, -1, 1}),
   Pid({gain, -1, 1}),
