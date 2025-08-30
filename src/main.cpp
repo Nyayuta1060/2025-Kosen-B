@@ -8,6 +8,8 @@ PidGain gain ={0.001, 0.001, 0.0};
 BufferedSerial pc(USBTX,USBRX,115200);
 dji::C620 robomas(PD_6,PD_5);
 
+constexpr robomas_amount = 8;
+
 std::array<Pid, robomas_amount> pid = {
   Pid({gain, -1, 1}),
   Pid({gain, -1, 1}),
