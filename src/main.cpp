@@ -4,8 +4,11 @@
 #include <array>
 
 CAN can(PC_6,PC_7,1e6);
-BufferedSerial(USBTX,USBRX,115200);
+PidGain gain ={0.001, 0.001, 0.0};
+BufferedSerial pc(USBTX,USBRX,115200);
 dji::C620 robomas(PD_6,PD_5);
+
+constexpr int robomas_amount = 8;
 
 std::array<Pid, robomas_amount> pid = {
   Pid({gain, -1, 1}),
@@ -16,12 +19,12 @@ std::array<Pid, robomas_amount> pid = {
   Pid({gain, -1, 1}),
   Pid({gain, -1, 1}),
   Pid({gain, -1, 1})
-}
+};
 
 constexpr int can_id[3] = {1,2,4};
-int pwm1[4] = {0};
-int pwm2[4] = {0};
-int pwm3[4] = {0};
+int16_t pwm1[4] = {0};
+int16_t pwm2[4] = {0};
+int16_t pwm3[4] = {0};
 
 float duration_to_sec(const std::chrono::duration<float> &duration);
 
@@ -96,33 +99,72 @@ struct PS5
 int main(){
   PS5 ps5;
   int16_t robomas_rpm[8] = {0};
-  auto now = HighResClock::now();
-  static auto pre = now;
+
+  constexpr int panda_arm_speed = 10000;
+  constexpr int panda_lift_speed = 10000;
 
   for (int i = 0; i < robomas_amount; ++i)
   {
       pid[i].reset();
   }
 
-  if(now - pre > 10ms){
-    float elapsed = duration_to_sec(now - pre);
+  while(1){
 
-    for (int i = 0; i < robomas_amount; i++){
-      int motor_dps = robomas.get_rpm(i + 1);
-      const float percent = pid[i].calc(robomas_rpm[i], motor_dps, elapsed);
+    static bool pre_left = 0;
+    static bool pre_right = 0;
+    static bool pre_up = 0;
+    static bool pre_down = 0;
 
-      robomas.set_output_percent(percent, i + 1);
+    auto now = HighResClock::now();
+    static auto pre = now;
+    robomas.read_data();
+
+    //ボタンの入力処理
+    if(ps5.read(can)){
+      if(ps5.left == 1 && pre_left == 0 && ps5.right == 0){
+        pwm1[2] = panda_arm_speed;
+      }else if(ps5.right == 1 && pre_right == 0 && ps5.left == 0){
+        pwm1[2] = -panda_arm_speed;
+      }else if(ps5.right == 0 && ps5.left == 0){
+        pwm1[2] = 0;
       }
-    
-    CANMessage msg1(can_id[0], (const uint8_t *)&pwm1, 8);
-    CANMessage msg2(can_id[1], (const uint8_t *)&pwm2, 8);
-    CANMessage msg3(can_id[1], (const uint8_t *)&pwm3, 8);
-    can.write(msg1);
-    can.write(msg2);
-    can.write(msg3)
 
-    robomas.write();
-    pre = now;
+      if(ps5.up == 1 && pre_up == 0 && ps5.down == 0){
+        pwm[3] = panda_lift_speed;
+      }else if(ps5.down == 1 && pre_down == 0 && ps5.up == 0){
+        pwm[3] = -panda_lift_speed;
+      }else if(ps5.up == 0 && ps5.down == 0){
+        pwm[3] = 0;
+      }
+
+      pre_right = ps5.right;
+      pre_left = ps5.left;
+      pre_up = ps5.up;
+      pre_down = ps5.down;
+    }
+
+    //CAN送信処理
+
+    if(now - pre > 10ms){
+      float elapsed = duration_to_sec(now - pre);
+
+      for (int i = 0; i < robomas_amount; i++){
+        int motor_dps = robomas.get_rpm(i + 1);
+        const float percent = pid[i].calc(robomas_rpm[i], motor_dps, elapsed);
+
+        robomas.set_output_percent(percent, i + 1);
+        }
+
+      CANMessage msg1(can_id[0], (const uint8_t *)&pwm1, 8);
+      CANMessage msg2(can_id[1], (const uint8_t *)&pwm2, 8);
+      CANMessage msg3(can_id[2], (const uint8_t *)&pwm3, 8);
+      can.write(msg1);
+      can.write(msg2);
+      can.write(msg3);
+
+      robomas.write();
+      pre = now;
+    }
   }
 }
 
