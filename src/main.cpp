@@ -8,7 +8,7 @@ PidGain gain ={0.001, 0.001, 0.0};
 BufferedSerial pc(USBTX,USBRX,115200);
 dji::C620 robomas(PD_6,PD_5);
 
-constexpr robomas_amount = 8;
+constexpr int robomas_amount = 8;
 
 std::array<Pid, robomas_amount> pid = {
   Pid({gain, -1, 1}),
@@ -102,6 +102,8 @@ int main(){
 
   constexpr int main_blocker_speed = 10000;
   constexpr int sub_blocker_speed = 10000;
+  constexpr int panda_arm_speed = 10000;
+  constexpr int panda_lift_speed = 10000;
 
   for (int i = 0; i < robomas_amount; ++i)
   {
@@ -114,6 +116,10 @@ int main(){
     static bool pre_circle = 0;
     static bool pre_square = 0;
     static bool pre_triangle = 0;
+    static bool pre_left = 0;
+    static bool pre_right = 0;
+    static bool pre_up = 0;
+    static bool pre_down = 0;
     
     auto now = HighResClock::now();
     static auto pre = now;
@@ -129,18 +135,39 @@ int main(){
         pwm1[0] = 0;
       }
 
-    if(ps5.triangle == 1 && pre_triangle == 0 && ps5.square == 0){
-      pwm1[1] = sub_blocker_speed;
-    }else if(ps5.square == 1 && pre_square == 0 && ps5.triangle == 0){
-      pwm1[1] = -sub_blocker_speed;
-    }else if(ps5.triangle == 0 && ps5.square == 0){
-      pwm1[1] = 0;
-    }
+      if(ps5.triangle == 1 && pre_triangle == 0 && ps5.square == 0){
+        pwm1[1] = sub_blocker_speed;
+      }else if(ps5.square == 1 && pre_square == 0 && ps5.triangle == 0){
+        pwm1[1] = -sub_blocker_speed;
+      }else if(ps5.triangle == 0 && ps5.square == 0){
+        pwm1[1] = 0;
+      }
+
+      if(ps5.left == 1 && pre_left == 0 && ps5.right == 0){
+        pwm1[2] = panda_arm_speed;
+      }else if(ps5.right == 1 && pre_right == 0 && ps5.left == 0){
+        pwm1[2] = -panda_arm_speed;
+      }else if(ps5.right == 0 && ps5.left == 0){
+        pwm1[2] = 0;
+      }
+
+      if(ps5.up == 1 && pre_up == 0 && ps5.down == 0){
+        pwm[3] = panda_lift_speed;
+      }else if(ps5.down == 1 && pre_down == 0 && ps5.up == 0){
+        pwm[3] = -panda_lift_speed;
+      }else if(ps5.up == 0 && ps5.down == 0){
+        pwm[3] = 0;
+      }
+
+      pre_right = ps5.right;
+      pre_left = ps5.left;
+      pre_up = ps5.up;
+      pre_down = ps5.down;
       pre_circle = ps5.circle;
       pre_cross = ps5.cross;
       pre_triangle = ps5.triangle
       pre_square = ps5.square
-    }
+  }
 
     //CAN送信処理
 
