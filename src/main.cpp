@@ -100,6 +100,8 @@ int main(){
   PS5 ps5;
   int16_t robomas_rpm[8] = {0};
 
+  constexpr int main_blocker_speed = 10000;
+  constexpr int sub_blocker_speed = 10000;
   constexpr int panda_arm_speed = 10000;
   constexpr int panda_lift_speed = 10000;
 
@@ -110,17 +112,37 @@ int main(){
 
   while(1){
 
+    static bool pre_cross = 0;
+    static bool pre_circle = 0;
+    static bool pre_square = 0;
+    static bool pre_triangle = 0;
     static bool pre_left = 0;
     static bool pre_right = 0;
     static bool pre_up = 0;
     static bool pre_down = 0;
-
+    
     auto now = HighResClock::now();
     static auto pre = now;
     robomas.read_data();
 
     //ボタンの入力処理
     if(ps5.read(can)){
+      if(ps5.circle == 1 && pre_circle == 0 && ps5.cross == 0){
+        pwm1[0] = main_blocker_speed;
+      }else if(ps5.cross == 1 && pre_cross == 0 && ps5.circle == 0){
+        pwm1[0] = -main_blocker_speed;
+      }else if(ps5.circle == 0 && ps5.cross == 0){
+        pwm1[0] = 0;
+      }
+
+      if(ps5.triangle == 1 && pre_triangle == 0 && ps5.square == 0){
+        pwm1[1] = sub_blocker_speed;
+      }else if(ps5.square == 1 && pre_square == 0 && ps5.triangle == 0){
+        pwm1[1] = -sub_blocker_speed;
+      }else if(ps5.triangle == 0 && ps5.square == 0){
+        pwm1[1] = 0;
+      }
+
       if(ps5.left == 1 && pre_left == 0 && ps5.right == 0){
         pwm1[2] = panda_arm_speed;
       }else if(ps5.right == 1 && pre_right == 0 && ps5.left == 0){
@@ -141,7 +163,11 @@ int main(){
       pre_left = ps5.left;
       pre_up = ps5.up;
       pre_down = ps5.down;
-    }
+      pre_circle = ps5.circle;
+      pre_cross = ps5.cross;
+      pre_triangle = ps5.triangle
+      pre_square = ps5.square
+  }
 
     //CAN送信処理
 
