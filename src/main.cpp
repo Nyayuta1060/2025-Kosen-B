@@ -98,7 +98,7 @@ int main(){
   PS5 ps5;
   int16_t robomas_rpm[8] = {0};
 
-  constexpr int blocker_speed = 10000;
+  constexpr int box-panda_speed = 10000;
 
   for (int i = 0; i < robomas_amount; ++i)
   {
@@ -115,16 +115,16 @@ int main(){
 
     //ボタンの入力処理
     if(ps5.read(can)){
-      if(ps5.circle == 1 && pre_circle == 0 && ps5.cross == 0){
-        pwm1[0] = blocker_speed;
-      }else if(ps5.cross == 1 && pre_cross == 0 && ps5.circle == 0){
-        pwm1[0] = -blocker_speed;
-      }else if(ps5.circle == 0 && ps5.cross == 0){
-        pwm1[0] = 0;
+      if(ps5.triangle == 1 && pre_triangle == 0 && ps5.square == 0){
+        pwm1[1] = box-panda_speed;
+      }else if(ps5.square == 1 && pre_square == 0 && ps5.triangle == 0){
+        pwm1[1] = -box-panda_speed;
+      }else if(ps5.triangle == 0 && ps5.square == 0){
+        pwm1[1] = 0;
       }
 
-      pre_circle = ps5.circle;
-      pre_cross = ps5.cross;
+      pre_triangle = ps5.triangle;
+      pre_square = ps5.square;
     }
 
     //CAN送信処理
