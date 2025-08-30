@@ -119,7 +119,7 @@ int main(){
         pwm1[0] = blocker_speed;
       }else if(ps5.cross == 1 && pre_cross == 0 && ps5.circle == 0){
         pwm1[0] = -blocker_speed;
-      }else{
+      }else if(ps5.circle == 0 && ps5.cross == 0){
         pwm1[0] = 0;
       }
 
